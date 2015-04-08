@@ -124,6 +124,7 @@ class Sixpack(object):
     def on_participate(self, request):
         alts = request.args.getlist('alternatives')
         experiment_name = request.args.get('experiment')
+        experiment_type = request.args.get('type')
         force = request.args.get('force')
         client_id = request.args.get('client_id')
         traffic_fraction = float(request.args.get('traffic_fraction', 1))
@@ -131,6 +132,12 @@ class Sixpack(object):
 
         if client_id is None or experiment_name is None or alts is None:
             return json_error({'message': 'missing arguments'}, request, 400)
+
+        if experiment_type is None:
+            experiment_type = "ab"
+
+        if experiment_type not in ["ab"]:
+            return json_error({'message': 'unsupported experiment type'}, request, 400)
 
         dt = None
         if request.args.get("datetime"):
