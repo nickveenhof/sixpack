@@ -136,7 +136,7 @@ class Sixpack(object):
         if experiment_type is None:
             experiment_type = "ab"
 
-        if experiment_type not in ["ab"]:
+        if Experiment.validate_algorithm(experiment_type):
             return json_error({'message': 'unsupported experiment type'}, request, 400)
 
         dt = None

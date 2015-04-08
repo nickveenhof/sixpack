@@ -13,6 +13,13 @@ VALID_EXPERIMENT_ALTERNATIVE_RE = re.compile(r"^[a-z0-9][a-z0-9\-_]*$", re.I)
 VALID_KPI_RE = re.compile(r"^[a-z0-9][a-z0-9\-_]*$", re.I)
 
 
+# Mapping algorithm names to implementing classes
+ALGORITHMS = {
+    "ab"          : ABExperiment,
+    "mab:egreedy" : MABEGreedyExperiment
+}
+
+
 class Client(object):
 
     def __init__(self, client_id, redis=None):
@@ -332,27 +339,7 @@ class Experiment(object):
         return None
 
     def choose_alternative(self, client):
-        rnd = round(random.uniform(1, 0.01), 2)
-        if rnd >= self.traffic_fraction:
-            self.exclude_client(client)
-            return self.control, False
-
-        return self._uniform_choice(client), True
-
-    # Ported from https://github.com/facebook/planout/blob/master/planout/ops/random.py
-    def _uniform_choice(self, client):
-        idx = self._get_hash(client) % len(self.alternatives)
-        return self.alternatives[idx]
-
-    def _get_hash(self, client):
-        salty = "{0}.{1}".format(self.name, client.client_id)
-
-        # We're going to take the first 7 bytes of the client UUID
-        # because of the largest integer values that can be represented safely
-        # with Sixpack client libraries
-        # More Info: https://github.com/seatgeek/sixpack/issues/132#issuecomment-54318218
-        hashed = sha1(salty).hexdigest()[:7]
-        return int(hashed, 16)
+        raise NotImplementedError("Please Implement this method")
 
     def existing_conversion(self, client):
         alts = self.get_alternative_names()
@@ -377,13 +364,14 @@ class Experiment(object):
             return _key("e:{0}".format(self.name))
 
     @classmethod
-    def find(cls, experiment_name,
+    def find(cls, experiment_name, experiment_type,
         redis=None):
 
         if not redis.sismember(_key("e"), experiment_name):
             raise ValueError('experiment does not exist')
 
-        return cls(experiment_name,
+        algorithm = ALGORITHMS[experiment_type]
+        return algorithm(experiment_name,
                    Experiment.load_alternatives(experiment_name, redis),
                    redis=redis)
 
@@ -403,7 +391,8 @@ class Experiment(object):
             experiment = Experiment.find(experiment_name, redis=redis)
             check_fraction = True
         except ValueError:
-            experiment = cls(experiment_name, alternatives, redis=redis)
+            algorithm = ALGORITHMS[experiment_type]
+            experiment = algorithm(experiment_name, alternatives, redis=redis)
             # TODO: I want to revist this later
             experiment.set_traffic_fraction(traffic_fraction)
             experiment.save()
@@ -453,6 +442,85 @@ class Experiment(object):
     def validate_kpi(kpi):
         return (isinstance(kpi, basestring) and
                 VALID_KPI_RE.match(kpi) is not None)
+
+    @staticmethod
+    def validate_algorithm(algorithm):
+        return algorithm in ALGORITHMS.keys()
+
+
+class ABExperiment(Experiment):
+
+    def __init__(self, name, alternatives,
+        winner=False,
+        traffic_fraction=False,
+        redis=None):
+        super(ABExperiment, self).__init__(name, alternatives, winner, traffic_fraction, redis)
+
+    def choose_alternative(self, client):
+        rnd = round(random.uniform(1, 0.01), 2)
+        if rnd >= self.traffic_fraction:
+            self.exclude_client(client)
+            return self.control, False
+
+        return self._uniform_choice(client), True
+
+    # Ported from https://github.com/facebook/planout/blob/master/planout/ops/random.py
+    def _uniform_choice(self, client):
+        idx = self._get_hash(client) % len(self.alternatives)
+        return self.alternatives[idx]
+
+    def _get_hash(self, client):
+        salty = "{0}.{1}".format(self.name, client.client_id)
+
+        # We're going to take the first 7 bytes of the client UUID
+        # because of the largest integer values that can be represented safely
+        # with Sixpack client libraries
+        # More Info: https://github.com/seatgeek/sixpack/issues/132#issuecomment-54318218
+        hashed = sha1(salty).hexdigest()[:7]
+        return int(hashed, 16)
+
+
+class MABEGreedyExperiment(Experiment):
+    ''' Very simple implementation of the epsilon-greedy algorithm. Every
+        conversion has a reward of 1, otherwise the reward is 0. This reduces
+        the update equation to the conversion rate of the alternatives.
+
+        To choose an alternative, we either pick a random alternative with
+        chance ɛ and the best converting alternative with chance 1 - ɛ.
+
+        The value for ɛ is currently hardcoded to 0.1
+    '''
+    def __init__(self, name, alternatives,
+        winner=False,
+        traffic_fraction=False,
+        redis=None):
+        super(MABEGreedyExperiment, self).__init__(name, alternatives, winner, traffic_fraction, redis)
+        self._epsilon = 0.1
+
+    def choose_alternative(self, client):
+        rnd = round(random.uniform(1, 0.01), 2)
+        if rnd >= self.traffic_fraction:
+            self.exclude_client(client)
+            return self.control, False
+
+        idx = 0
+
+        if random.random() < self._epsilon:
+            # explore - pick a random alternative
+            idx = random.randrange(len(self.alternatives))
+        else:
+            # exploit - pick the alternative with the highest conversion rate
+            # pick random between multiple alternatives with max conversion rate
+            # TODO: recomputing this every time might be too inefficient
+            values = [a.conversion_rate() for a in self.alternatives]
+            vmax = max(values)
+            idxs = [i for i,v in enumerate(values) if v == vmax]
+            if len(idxs) == 1:
+                idx = idxs[0]
+            else:
+                idx = idxs[random.randrange(len(idxs))]
+
+        return self.alternatives[idx], True
 
 
 class Alternative(object):
