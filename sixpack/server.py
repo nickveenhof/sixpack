@@ -89,18 +89,25 @@ class Sixpack(object):
             return json_success({'excluded': 'true'}, request)
 
         experiment_name = request.args.get('experiment')
+        experiment_type = unquote(request.args.get('type'))
         client_id = request.args.get('client_id')
         kpi = request.args.get('kpi', None)
 
         if client_id is None or experiment_name is None:
             return json_error({'message': 'missing arguments'}, request, 400)
 
+        if experiment_type is None:
+            experiment_type = "ab"
+
+        if not Experiment.validate_algorithm(experiment_type):
+            return json_error({'message': 'unsupported experiment type'}, request, 400)
+
         dt = None
         if request.args.get("datetime"):
             dt = dateutil.parser.parse(request.args.get("datetime"))
 
         try:
-            alt = convert(experiment_name, client_id, kpi=kpi, datetime=dt, redis=self.redis)
+            alt = convert(experiment_name, experiment_type, client_id, kpi=kpi, datetime=dt, redis=self.redis)
         except ValueError as e:
             return json_error({'message': str(e)}, request, 400)
 
@@ -124,7 +131,7 @@ class Sixpack(object):
     def on_participate(self, request):
         alts = request.args.getlist('alternatives')
         experiment_name = request.args.get('experiment')
-        experiment_type = request.args.get('type')
+        experiment_type = unquote(request.args.get('type'))
         force = request.args.get('force')
         client_id = request.args.get('client_id')
         traffic_fraction = float(request.args.get('traffic_fraction', 1))
@@ -136,7 +143,7 @@ class Sixpack(object):
         if experiment_type is None:
             experiment_type = "ab"
 
-        if Experiment.validate_algorithm(experiment_type):
+        if not Experiment.validate_algorithm(experiment_type):
             return json_error({'message': 'unsupported experiment type'}, request, 400)
 
         dt = None
@@ -144,14 +151,14 @@ class Sixpack(object):
             dt = dateutil.parser.parse(request.args.get("datetime"))
 
         if should_exclude_visitor(request):
-            exp = Experiment.find(experiment_name, redis=self.redis)
+            exp = Experiment.find(experiment_name, experiment_type, redis=self.redis)
             if exp.winner is not None:
                 alt = exp.winner
             else:
                 alt = exp.control
         else:
             try:
-                alt = participate(experiment_name, alts, client_id,
+                alt = participate(experiment_name, experiment_type, alts, client_id,
                                   force=force, traffic_fraction=traffic_fraction,
                                   prefetch=prefetch, datetime=dt, redis=self.redis)
             except ValueError as e:

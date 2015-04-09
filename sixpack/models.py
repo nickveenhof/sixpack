@@ -1,3 +1,4 @@
+# coding=utf8
 from datetime import datetime
 from hashlib import sha1
 from math import log
@@ -11,13 +12,6 @@ from db import _key, msetbit, sequential_id, first_key_with_bit_set
 # This is pretty restrictive, but we can always relax it later.
 VALID_EXPERIMENT_ALTERNATIVE_RE = re.compile(r"^[a-z0-9][a-z0-9\-_]*$", re.I)
 VALID_KPI_RE = re.compile(r"^[a-z0-9][a-z0-9\-_]*$", re.I)
-
-
-# Mapping algorithm names to implementing classes
-ALGORITHMS = {
-    "ab"          : ABExperiment,
-    "mab:egreedy" : MABEGreedyExperiment
-}
 
 
 class Client(object):
@@ -364,19 +358,23 @@ class Experiment(object):
             return _key("e:{0}".format(self.name))
 
     @classmethod
-    def find(cls, experiment_name, experiment_type,
+    def find(cls, experiment_name, experiment_type=None,
         redis=None):
 
         if not redis.sismember(_key("e"), experiment_name):
             raise ValueError('experiment does not exist')
 
-        algorithm = ALGORITHMS[experiment_type]
+        if experiment_type is None:
+            algorithm = Experiment
+        else:
+            algorithm = ALGORITHMS[experiment_type]
+
         return algorithm(experiment_name,
                    Experiment.load_alternatives(experiment_name, redis),
                    redis=redis)
 
     @classmethod
-    def find_or_create(cls, experiment_name, alternatives,
+    def find_or_create(cls, experiment_name, experiment_type, alternatives,
         traffic_fraction=None,
         redis=None):
 
@@ -522,6 +520,12 @@ class MABEGreedyExperiment(Experiment):
 
         return self.alternatives[idx], True
 
+
+# Mapping algorithm names to implementing classes
+ALGORITHMS = {
+    "ab"          : ABExperiment,
+    "mab:egreedy" : MABEGreedyExperiment
+}
 
 class Alternative(object):
 

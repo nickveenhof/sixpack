@@ -167,7 +167,7 @@ def internal_server_error(e):
 def find_or_404(experiment_name):
     try:
         experiment_name = url=urllib.unquote(experiment_name).decode('utf8') 
-        exp = Experiment.find(experiment_name, db.REDIS)
+        exp = Experiment.find(experiment_name, redis=db.REDIS)
         if request.args.get('kpi'):
             exp.set_kpi(request.args.get('kpi'))
         return exp
