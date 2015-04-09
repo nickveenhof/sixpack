@@ -4,7 +4,7 @@ import json
 import dateutil.parser
 
 from sixpack.server import create_app
-from sixpack.models import Client, Experiment
+from sixpack.models import Client, ABExperiment, Experiment
 
 
 class TestExperimentLua(unittest.TestCase):
@@ -13,14 +13,14 @@ class TestExperimentLua(unittest.TestCase):
         self.app = create_app()
 
     def test_convert(self):
-        exp = Experiment('test-convert', ['1', '2'], redis=self.app.redis)
+        exp = ABExperiment('test-convert', ['1', '2'], redis=self.app.redis)
         client = Client("eric", redis=self.app.redis)
         exp.get_alternative(client)
         exp.convert(client)
         self.assertEqual(exp.total_conversions(), 1)
 
     def test_cant_convert_twice(self):
-        exp = Experiment('test-cant-convert-twice', ['1', '2'], redis=self.app.redis)
+        exp = ABExperiment('test-cant-convert-twice', ['1', '2'], redis=self.app.redis)
         client = Client("eric", redis=self.app.redis)
         alt = exp.get_alternative(client)
         exp.convert(client)
@@ -37,7 +37,7 @@ class TestExperimentLua(unittest.TestCase):
         self.assertEqual(total_conversions, 1)
 
     def test_find_existing_conversion(self):
-        exp = Experiment('test-find-existing-conversion', ['1', '2'], redis=self.app.redis)
+        exp = ABExperiment('test-find-existing-conversion', ['1', '2'], redis=self.app.redis)
         client = Client("eric", redis=self.app.redis)
         alt = exp.get_alternative(client)
         exp.convert(client)

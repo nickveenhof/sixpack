@@ -68,7 +68,7 @@ class TestServer(unittest.TestCase):
         self.assertEqual(data['status'], 'ok')
 
     def test_participate_bad_experiment_type(self):
-        resp = self.client.get("/participate?experiment=dummy&client_id=foo&alternatives=one&alternatives=two&experiment_type=foobar")
+        resp = self.client.get("/participate?experiment=dummy&client_id=foo&alternatives=one&alternatives=two&type=foobar")
         data = json.loads(resp.data)
         self.assertEqual(400, resp.status_code)
         self.assertTrue('status' in data)

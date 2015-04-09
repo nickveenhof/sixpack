@@ -462,7 +462,7 @@ class ABExperiment(Experiment):
 
         return self._uniform_choice(client), True
 
-    # Ported from https://github.com/facebook/planout/blob/master/planout/ops/random.py
+    # Ported from https://github.com/facebook/planout/blob/master/python/planout/ops/random.py
     def _uniform_choice(self, client):
         idx = self._get_hash(client) % len(self.alternatives)
         return self.alternatives[idx]

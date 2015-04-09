@@ -89,7 +89,7 @@ class Sixpack(object):
             return json_success({'excluded': 'true'}, request)
 
         experiment_name = request.args.get('experiment')
-        experiment_type = unquote(request.args.get('type'))
+        experiment_type = request.args.get('type')
         client_id = request.args.get('client_id')
         kpi = request.args.get('kpi', None)
 
@@ -98,6 +98,8 @@ class Sixpack(object):
 
         if experiment_type is None:
             experiment_type = "ab"
+        else:
+            experiment_type = unquote(experiment_type)
 
         if not Experiment.validate_algorithm(experiment_type):
             return json_error({'message': 'unsupported experiment type'}, request, 400)
@@ -131,7 +133,7 @@ class Sixpack(object):
     def on_participate(self, request):
         alts = request.args.getlist('alternatives')
         experiment_name = request.args.get('experiment')
-        experiment_type = unquote(request.args.get('type'))
+        experiment_type = request.args.get('type')
         force = request.args.get('force')
         client_id = request.args.get('client_id')
         traffic_fraction = float(request.args.get('traffic_fraction', 1))
@@ -142,6 +144,8 @@ class Sixpack(object):
 
         if experiment_type is None:
             experiment_type = "ab"
+        else:
+            experiment_type = unquote(experiment_type)
 
         if not Experiment.validate_algorithm(experiment_type):
             return json_error({'message': 'unsupported experiment type'}, request, 400)
