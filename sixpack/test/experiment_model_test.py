@@ -139,7 +139,7 @@ class TestExperimentModel(unittest.TestCase):
         exp = Experiment.find_or_create('winner-key', 'ab', ['win', 'lose'], redis=self.redis)
         self.assertEqual(exp._winner_key, "{0}:winner".format(exp.key()))
 
-    def test_ab_get_alternative(self):
+    def test_get_alternative(self):
         client = Client(10, redis=self.redis)
 
         exp = Experiment.find_or_create('archived-control', 'ab', ['w', 'l'], redis=self.redis)
