@@ -28,7 +28,7 @@ class TestApi(unittest.TestCase):
         exp = ABExperiment("test", ["no", "yes"], winner=None)
         exp.convert = Mock(return_value=Alternative("yes", exp))
         mock_find.return_value = exp
-        alternative = convert("test", "ab", "id1")
+        alternative = convert("test", "ab", "id1", 1)
         self.assertEqual("yes", alternative.name)
         self.assertEqual("test", alternative.experiment.name)
 
@@ -37,7 +37,7 @@ class TestApi(unittest.TestCase):
         exp = ABExperiment("test", ["no", "yes"], winner=None)
         exp.convert = Mock(return_value=Alternative("yes", exp))
         mock_find.return_value = exp
-        alternative = convert("test", "ab", "id1", kpi="goal1")
+        alternative = convert("test", "ab", "id1", 1, kpi="goal1")
         # TODO: we're not really asserting anything about the KPI
         self.assertEqual("yes", alternative.name)
         self.assertEqual("test", alternative.experiment.name)

@@ -25,7 +25,7 @@ def participate(experiment, experiment_type, alternatives, client_id,
     return alt
 
 
-def convert(experiment, experiment_type, client_id,
+def convert(experiment, experiment_type, client_id, reward,
     kpi=None,
     datetime=None,
     redis=None):
@@ -34,7 +34,7 @@ def convert(experiment, experiment_type, client_id,
 
     if cfg.get('enabled', True):
         client = Client(client_id, redis=redis)
-        alt = exp.convert(client, dt=datetime, kpi=kpi)
+        alt = exp.convert(client, reward, dt=datetime, kpi=kpi)
     else:
         alt = exp.control
 

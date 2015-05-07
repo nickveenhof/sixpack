@@ -58,7 +58,7 @@ class MABTester:
 				self._cumulative_rewards[index] = cumulative_reward
 
 				if reward == 1:
-					self._experiment.convert(client)
+					self._experiment.convert(client, 1)
 		return self._check_average_monotonicity()
 
 	def _check_average_monotonicity (self):

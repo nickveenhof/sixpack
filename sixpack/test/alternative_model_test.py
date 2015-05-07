@@ -1,7 +1,9 @@
 import unittest
 import fakeredis
 
-from sixpack.models import Alternative, Experiment
+from sixpack.models import Alternative, Experiment, Client
+from sixpack.server import create_app
+
 
 
 class TestAlternativeModel(unittest.TestCase):
@@ -9,7 +11,9 @@ class TestAlternativeModel(unittest.TestCase):
     unit = True
 
     def setUp(self):
-        self.redis = fakeredis.FakeStrictRedis()
+        self.app = create_app()
+        # TODO: change this to fake-redis (msetbit script isn't registered with fakeredis currently)
+        self.redis = self.app.redis
         self.client_id = 381
 
     def test_key(self):
@@ -98,3 +102,72 @@ class TestAlternativeModel(unittest.TestCase):
 
         # key = _key("conversion:{0}:{1}".format(alt.experiment_name, alt.name))
         # self.redis.setbit.assert_called_once_with(key, self.client_id, 1)
+
+    def test_total_reward(self):
+        client = Client(10, redis=self.redis)
+
+        exp = Experiment('trolololo', ['yes', 'no'], redis=self.redis)
+        exp.save()
+
+        alt = Alternative('yes', exp, redis=self.redis)
+
+        client = Client(10, redis=self.redis)
+        alt.record_participation(client)
+        alt.record_conversion(client, 42)
+
+        client = Client(20, redis=self.redis)
+        alt.record_participation(client)
+        alt.record_conversion(client, 21)
+
+        self.assertEqual(63, alt.total_reward())
+
+    def test_average_reward_single(self):
+        client = Client(10, redis=self.redis)
+
+        exp = Experiment('trololololo', ['yes', 'no'], redis=self.redis)
+        exp.save()
+
+        alt = Alternative('yes', exp, redis=self.redis)
+        alt.record_participation(client)
+        alt.record_conversion(client, 42)
+
+        self.assertEqual(42, alt.average_reward())
+
+    def test_average_reward_all_converted(self):
+        exp = Experiment('trolololololo', ['yes', 'no'], redis=self.redis)
+        exp.save()
+
+        alt = Alternative('yes', exp, redis=self.redis)
+
+        client = Client(10, redis=self.redis)
+        alt.record_participation(client)
+        alt.record_conversion(client, 42)
+
+        client = Client(20, redis=self.redis)
+        alt.record_participation(client)
+        alt.record_conversion(client, 12)
+
+        self.assertEqual(27, alt.average_reward())
+
+    def test_average_reward_some_not_converted(self):
+        exp = Experiment('trololololololo', ['yes', 'no'], redis=self.redis)
+        exp.save()
+
+        alt = Alternative('yes', exp, redis=self.redis)
+
+        for i in range(10):
+            client = Client(i, redis=self.redis)
+            alt.record_participation(client)
+            alt.record_conversion(client, 42)
+
+        for i in range(10):
+            client = Client(i+10, redis=self.redis)
+            alt.record_participation(client)
+
+        for i in range(10):
+            client = Client(i+20, redis=self.redis)
+            alt.record_participation(client)
+            alt.record_conversion(client, 12)
+
+        # (10 * 42 + 10 * 0 + 10 * 12) / 30
+        self.assertEqual(18, alt.average_reward())

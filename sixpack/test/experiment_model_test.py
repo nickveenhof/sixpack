@@ -321,7 +321,7 @@ class TestExperimentModel(unittest.TestCase):
         client = Client(100, redis=self.redis)
 
         exp.get_alternative(client)
-        exp.convert(client, None, 'bananza')
+        exp.convert(client, 1, None, 'bananza')
 
         exp2 = Experiment.find_or_create('multi-kpi', 'ab', ['kpi', '123'], redis=self.redis)
         self.assertEqual(exp2.kpi, None)

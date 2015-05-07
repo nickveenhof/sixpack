@@ -16,17 +16,17 @@ class TestExperimentLua(unittest.TestCase):
         exp = ABExperiment('test-convert', ['1', '2'], redis=self.app.redis)
         client = Client("eric", redis=self.app.redis)
         exp.get_alternative(client)
-        exp.convert(client)
+        exp.convert(client, 1)
         self.assertEqual(exp.total_conversions(), 1)
 
     def test_cant_convert_twice(self):
         exp = ABExperiment('test-cant-convert-twice', ['1', '2'], redis=self.app.redis)
         client = Client("eric", redis=self.app.redis)
         alt = exp.get_alternative(client)
-        exp.convert(client)
+        exp.convert(client, 1)
         self.assertEqual(exp.total_conversions(), 1)
 
-        exp.convert(client, dt=dateutil.parser.parse("2012-01-01"))
+        exp.convert(client, 1, dt=dateutil.parser.parse("2012-01-01"))
         self.assertEqual(exp.total_conversions(), 1)
 
         data = exp.objectify_by_period("day")
@@ -40,7 +40,7 @@ class TestExperimentLua(unittest.TestCase):
         exp = ABExperiment('test-find-existing-conversion', ['1', '2'], redis=self.app.redis)
         client = Client("eric", redis=self.app.redis)
         alt = exp.get_alternative(client)
-        exp.convert(client)
+        exp.convert(client, 1)
         alt2 = exp.existing_conversion(client)
         self.assertIsNotNone(alt2)
         self.assertTrue(alt.name == alt2.name)

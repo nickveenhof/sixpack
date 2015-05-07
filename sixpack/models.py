@@ -218,7 +218,7 @@ class Experiment(object):
     def is_archived(self):
         return self.redis.hexists(self.key(), 'archived')
 
-    def convert(self, client, dt=None, kpi=None):
+    def convert(self, client, reward, dt=None, kpi=None):
         alternative = self.existing_alternative(client)
         if not alternative:
             raise ValueError('this client was not participating')
@@ -229,7 +229,7 @@ class Experiment(object):
             self.add_kpi(kpi)
 
         if not self.existing_conversion(client):
-            alternative.record_conversion(client, dt=dt)
+            alternative.record_conversion(client, reward, dt=dt)
 
         return alternative
 
@@ -510,7 +510,7 @@ class MABEGreedyExperiment(Experiment):
             # exploit - pick the alternative with the highest conversion rate
             # pick random between multiple alternatives with max conversion rate
             # TODO: recomputing this every time might be too inefficient
-            values = [a.conversion_rate() for a in self.alternatives]
+            values = [a.average_reward() for a in self.alternatives]
             vmax = max(values)
             idxs = [i for i,v in enumerate(values) if v == vmax]
             if len(idxs) == 1:
@@ -681,7 +681,7 @@ class Alternative(object):
         ]
         msetbit(keys=keys, args=([self.experiment.sequential_id(client), 1] * len(keys)))
 
-    def record_conversion(self, client, dt=None):
+    def record_conversion(self, client, reward, dt=None):
         """Record a user's conversion in a test along with a given variation"""
         if dt is None:
             date = datetime.now()
@@ -695,6 +695,8 @@ class Alternative(object):
         pipe.sadd(_key("c:{0}:years".format(experiment_key)), date.strftime('%Y'))
         pipe.sadd(_key("c:{0}:months".format(experiment_key)), date.strftime('%Y-%m'))
         pipe.sadd(_key("c:{0}:days".format(experiment_key)), date.strftime('%Y-%m-%d'))
+
+        pipe.incrbyfloat(_key("c:{0}:rewards:total".format(experiment_key)), reward)
 
         pipe.execute()
 
@@ -713,6 +715,20 @@ class Alternative(object):
     def conversion_rate(self):
         try:
             return self.completed_count() / float(self.participant_count())
+        except ZeroDivisionError:
+            return 0
+
+    def total_reward(self):
+        experiment_key = self.experiment.kpi_key()
+
+        result = self.redis.get(_key("c:{0}:rewards:total".format(experiment_key)))
+        if result is None:
+            return 0
+        return float(result)
+
+    def average_reward(self):
+        try:
+            return self.total_reward() / float(self.participant_count())
         except ZeroDivisionError:
             return 0
 
