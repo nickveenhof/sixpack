@@ -14,8 +14,8 @@ class TestMABEGreedyExperiment(unittest.TestCase):
 	unit = True
 
 	def setUp(self):
-        self.app = create_app()
-        # TODO: change this to fake-redis (msetbit script isn't registered with fakeredis currently)
+		self.app = create_app()
+		# TODO: change this to fake-redis (msetbit script isn't registered with fakeredis currently)
 		self.redis = self.app.redis
 
 	def test_egreedy(self):

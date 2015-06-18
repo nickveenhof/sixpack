@@ -5,11 +5,12 @@ from config import CONFIG as cfg
 def participate(experiment, experiment_type, alternatives, client_id,
     force=None,
     traffic_fraction=None,
+    explore_fraction=None,
     prefetch=False,
     datetime=None,
     redis=None):
 
-    exp = Experiment.find_or_create(experiment, experiment_type, alternatives, traffic_fraction=traffic_fraction, redis=redis)
+    exp = Experiment.find_or_create(experiment, experiment_type, alternatives, traffic_fraction=traffic_fraction, explore_fraction=explore_fraction, redis=redis)
 
     alt = None
     if force and force in alternatives:

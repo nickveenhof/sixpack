@@ -26,6 +26,7 @@ class Experiment(object):
     def __init__(self, name, alternatives,
         winner=False,
         traffic_fraction=False,
+        explore_fraction=0.1,
         redis=None):
 
         if len(alternatives) < 2:
@@ -39,6 +40,7 @@ class Experiment(object):
         # False here is a sentinal value for "not looked up yet"
         self._winner = winner
         self._traffic_fraction = traffic_fraction
+        self._explore_fraction = explore_fraction
         self._sequential_ids = dict()
 
     def __repr__(self):
@@ -51,6 +53,7 @@ class Experiment(object):
             'alternatives': [],
             'created_at': self.created_at,
             'traffic_fraction': self.traffic_fraction,
+            'explore_fraction': self.explore_fraction,
             'total_participants': self.total_participants(),
             'total_conversions': self.total_conversions(),
             'description': self.description,
@@ -85,6 +88,7 @@ class Experiment(object):
 
         pipe.hset(self.key(), 'created_at', datetime.now().strftime("%Y-%m-%d %H:%M"))
         pipe.hset(self.key(), 'traffic_fraction', self._traffic_fraction)
+        pipe.hset(self.key(), 'explore_fraction', self._explore_fraction)
 
         # reverse here and use lpush to keep consistent with using lrange
         for alternative in reversed(self.alternatives):
@@ -287,6 +291,22 @@ class Experiment(object):
 
         self._traffic_fraction = fraction
 
+    @property
+    def explore_fraction(self):
+        if self._explore_fraction is False:
+            try:
+                self._explore_fraction = float(self.redis.hget(self.key(), 'explore_fraction'))
+            except (TypeError, ValueError) as e:
+                self._explore_fraction = 0.1
+        return self._explore_fraction
+
+    def set_explore_fraction(self, fraction):
+        fraction = float(fraction)
+        if not 0 < fraction <= 1:
+            raise ValueError('invalid explore fraction range')
+
+        self._explore_fraction = fraction
+
     def sequential_id(self, client):
         """Return the sequential id for this test for the passed in client"""
         if client.client_id not in self._sequential_ids:
@@ -375,7 +395,7 @@ class Experiment(object):
 
     @classmethod
     def find_or_create(cls, experiment_name, experiment_type, alternatives,
-        traffic_fraction=None,
+        traffic_fraction=None, explore_fraction=None,
         redis=None):
 
         if len(alternatives) < 2:
@@ -383,6 +403,9 @@ class Experiment(object):
 
         if traffic_fraction is None:
             traffic_fraction = 1
+
+        if explore_fraction is None:
+            explore_fraction = 0.1
 
         check_fraction = False
         try:
@@ -393,6 +416,7 @@ class Experiment(object):
             experiment = algorithm(experiment_name, alternatives, redis=redis)
             # TODO: I want to revist this later
             experiment.set_traffic_fraction(traffic_fraction)
+            experiment.set_explore_fraction(explore_fraction)
             experiment.save()
 
         if check_fraction and experiment.traffic_fraction != traffic_fraction:
@@ -451,8 +475,9 @@ class ABExperiment(Experiment):
     def __init__(self, name, alternatives,
         winner=False,
         traffic_fraction=False,
+        explore_fraction=False,
         redis=None):
-        super(ABExperiment, self).__init__(name, alternatives, winner, traffic_fraction, redis)
+        super(ABExperiment, self).__init__(name, alternatives, winner, traffic_fraction, explore_fraction, redis)
 
     def choose_alternative(self, client):
         rnd = round(random.uniform(1, 0.01), 2)
@@ -491,9 +516,9 @@ class MABEGreedyExperiment(Experiment):
     def __init__(self, name, alternatives,
         winner=False,
         traffic_fraction=False,
+        explore_fraction=False,
         redis=None):
-        super(MABEGreedyExperiment, self).__init__(name, alternatives, winner, traffic_fraction, redis)
-        self._epsilon = 0.1
+        super(MABEGreedyExperiment, self).__init__(name, alternatives, winner, traffic_fraction, explore_fraction, redis)
 
     def choose_alternative(self, client):
         rnd = round(random.uniform(1, 0.01), 2)
@@ -503,7 +528,7 @@ class MABEGreedyExperiment(Experiment):
 
         idx = 0
 
-        if random.random() < self._epsilon:
+        if random.random() < self.explore_fraction:
             # explore - pick a random alternative
             idx = random.randrange(len(self.alternatives))
         else:
