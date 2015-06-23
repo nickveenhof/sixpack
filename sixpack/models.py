@@ -329,9 +329,9 @@ class Experiment(object):
 
         chosen_alternative = self.existing_alternative(client)
         if not chosen_alternative:
-            chosen_alternative, participate = self.choose_alternative(client)
+            chosen_alternative, participate, explore = self.choose_alternative(client)
             if participate and not prefetch:
-                chosen_alternative.record_participation(client, dt=dt)
+                chosen_alternative.record_participation(client, explore, dt=dt)
 
         return chosen_alternative
 
@@ -487,9 +487,9 @@ class ABExperiment(Experiment):
         rnd = round(random.uniform(1, 0.01), 2)
         if rnd >= self.traffic_fraction:
             self.exclude_client(client)
-            return self.control, False
+            return self.control, False, False
 
-        return self._uniform_choice(client), True
+        return self._uniform_choice(client), True, True
 
     # Ported from https://github.com/facebook/planout/blob/master/python/planout/ops/random.py
     def _uniform_choice(self, client):
@@ -528,13 +528,14 @@ class MABEGreedyExperiment(Experiment):
         rnd = round(random.uniform(1, 0.01), 2)
         if rnd >= self.traffic_fraction:
             self.exclude_client(client)
-            return self.control, False
+            return self.control, False, False
 
         idx = 0
 
         if random.random() < self.explore_fraction:
             # explore - pick a random alternative
             idx = random.randrange(len(self.alternatives))
+            return self.alternatives[idx], True, True
         else:
             # exploit - pick the alternative with the highest conversion rate
             # pick random between multiple alternatives with max conversion rate
@@ -546,8 +547,7 @@ class MABEGreedyExperiment(Experiment):
                 idx = idxs[0]
             else:
                 idx = idxs[random.randrange(len(idxs))]
-
-        return self.alternatives[idx], True
+            return self.alternatives[idx], True, False
 
 
 # Mapping algorithm names to implementing classes
@@ -574,30 +574,42 @@ class Alternative(object):
         PERIOD_TO_METHOD_MAP = {
             'day': {
                 'participants': self.participants_by_day,
-                'conversions': self.conversions_by_day
+                'conversions': self.conversions_by_day,
+                'reward': self.reward_by_day,
+                'reward_explore': self.reward_explore_by_day,
             },
             'month': {
                 'participants': self.participants_by_month,
-                'conversions': self.conversions_by_month
+                'conversions': self.conversions_by_month,
+                'reward': self.reward_by_month,
+                'reward_explore': self.reward_explore_by_month
             },
             'year': {
                 'participants': self.participants_by_year,
-                'conversions': self.conversions_by_year
+                'conversions': self.conversions_by_year,
+                'reward': self.reward_by_year,
+                'reward_explore': self.reward_explore_by_year
             },
         }
 
         data = []
         conversion_fn = PERIOD_TO_METHOD_MAP[period]['conversions']
         participants_fn = PERIOD_TO_METHOD_MAP[period]['participants']
+        reward_fn = PERIOD_TO_METHOD_MAP[period]['reward']
+        reward_explore_fn = PERIOD_TO_METHOD_MAP[period]['reward_explore']
 
         conversions = conversion_fn()
         participants = participants_fn()
+        reward = reward_fn()
+        reward_explore = reward_explore_fn()
 
-        dates = sorted(list(set(conversions.keys() + participants.keys())))
+        dates = sorted(list(set(conversions.keys() + participants.keys() + reward.keys() + reward_explore.keys())))
         for date in dates:
             _data = {
                 'conversions': conversions.get(date, 0),
                 'participants': participants.get(date, 0),
+                'reward': reward.get(date, 0),
+                'reward_explore': reward_explore.get(date, 0),
                 'date': date
             }
             data.append(_data)
@@ -681,7 +693,52 @@ class Alternative(object):
 
         return stats
 
-    def record_participation(self, client, dt=None):
+    def reward_by_day(self):
+        return self._get_reward_stats('total', 'days')
+
+    def reward_by_month(self):
+        return self._get_reward_stats('total', 'months')
+
+    def reward_by_year(self):
+        return self._get_reward_stats('total', 'years')
+
+    def reward_explore_by_day(self):
+        return self._get_reward_stats('explore', 'days')
+
+    def reward_explore_by_month(self):
+        return self._get_reward_stats('explore', 'months')
+
+    def reward_explore_by_year(self):
+        return self._get_reward_stats('explore', 'years')
+
+    def _get_reward_stats(self, stat_type, stat_range):
+        if stat_type not in ['total', 'explore', 'exploit']:
+            raise ValueError("Unrecognized stat type: {0}".format(stat_type))
+
+        if stat_range not in ['days', 'months', 'years']:
+            raise ValueError("Unrecognized stat range: {0}".format(stat_range))
+
+        exp_key = self.experiment.kpi_key()
+
+        stats = {}
+
+        pipe = self.redis.pipeline()
+
+        search_key = _key("{0}:{1}:{2}".format(stat_type, exp_key, stat_range))
+        keys = self.redis.smembers(search_key)
+
+        for k in keys:
+            name = self.name if stat_type == 'p' else "{0}:users".format(self.name)
+            range_key = _key("c:{0}:{1}:rewards:{3}".format(exp_key, k, stat_type))
+            pipe.get(range_key)
+
+        redis_results = pipe.execute()
+        for idx, k in enumerate(keys):
+            stats[k] = float(redis_results[idx])
+
+        return stats
+
+    def record_participation(self, client, exploration=True,` dt=None):
         """Record a user's participation in a test along with a given variation"""
         if dt is None:
             date = datetime.now()
@@ -695,6 +752,8 @@ class Alternative(object):
         pipe.sadd(_key("p:{0}:years".format(experiment_key)), date.strftime('%Y'))
         pipe.sadd(_key("p:{0}:months".format(experiment_key)), date.strftime('%Y-%m'))
         pipe.sadd(_key("p:{0}:days".format(experiment_key)), date.strftime('%Y-%m-%d'))
+
+        pipe.setbit("p:{0}:explore".format(experiment_key), self.experiment.sequential_id(client), exploration and 1 or 0)
 
         pipe.execute()
 
@@ -717,6 +776,8 @@ class Alternative(object):
         else:
             date = dt
 
+        exploration = self.redis.getbit("p:{0}:explore".format(experiment_key), self.experiment.sequential_id(client))
+
         experiment_key = self.experiment.kpi_key()
 
         pipe = self.redis.pipeline()
@@ -726,6 +787,19 @@ class Alternative(object):
         pipe.sadd(_key("c:{0}:days".format(experiment_key)), date.strftime('%Y-%m-%d'))
 
         pipe.incrbyfloat(_key("c:{0}:rewards:total".format(experiment_key)), reward)
+        pipe.incrbyfloat(_key("c:{0}:{1}:rewards:total".format(experiment_key, date.strftime('%Y'))), reward)
+        pipe.incrbyfloat(_key("c:{0}:{1}:rewards:total".format(experiment_key, date.strftime('%Y-%m'))), reward)
+        pipe.incrbyfloat(_key("c:{0}:{1}:rewards:total".format(experiment_key, date.strftime('%Y-%m-%d'))), reward)
+        if exploration:
+            pipe.incrbyfloat(_key("c:{0}:rewards:explore".format(experiment_key)), reward)
+            pipe.incrbyfloat(_key("c:{0}:{1}:rewards:explore".format(experiment_key, date.strftime('%Y'))), reward)
+            pipe.incrbyfloat(_key("c:{0}:{1}:rewards:explore".format(experiment_key, date.strftime('%Y-%m'))), reward)
+            pipe.incrbyfloat(_key("c:{0}:{1}:rewards:explore".format(experiment_key, date.strftime('%Y-%m-%d'))), reward)
+        else:
+            pipe.incrbyfloat(_key("c:{0}:rewards:exploit".format(experiment_key)), reward)
+            pipe.incrbyfloat(_key("c:{0}:{1}:rewards:exploit".format(experiment_key, date.strftime('%Y'))), reward)
+            pipe.incrbyfloat(_key("c:{0}:{1}:rewards:exploit".format(experiment_key, date.strftime('%Y-%m'))), reward)
+            pipe.incrbyfloat(_key("c:{0}:{1}:rewards:exploit".format(experiment_key, date.strftime('%Y-%m-%d'))), reward)
 
         pipe.execute()
 
