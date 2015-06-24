@@ -738,7 +738,7 @@ class Alternative(object):
 
         return stats
 
-    def record_participation(self, client, exploration=True,` dt=None):
+    def record_participation(self, client, exploration=True, dt=None):
         """Record a user's participation in a test along with a given variation"""
         if dt is None:
             date = datetime.now()
