@@ -410,7 +410,7 @@ class Experiment(object):
 
         check_fraction = False
         try:
-            experiment = Experiment.find(experiment_name, experiment_type, redis=redis)
+            experiment = Experiment.find(experiment_name, redis=redis)
             check_fraction = True
         except ValueError:
             algorithm = ALGORITHMS[experiment_type]
