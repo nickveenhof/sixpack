@@ -86,6 +86,7 @@ class Experiment(object):
         if self.is_new_record():
             pipe.sadd(_key('e'), self.name)
 
+        pipe.hset(self.key(), 'algorithm', self.algorithm)
         pipe.hset(self.key(), 'created_at', datetime.now().strftime("%Y-%m-%d %H:%M"))
         pipe.hset(self.key(), 'traffic_fraction', self._traffic_fraction)
         pipe.hset(self.key(), 'explore_fraction', self._explore_fraction)
@@ -378,16 +379,16 @@ class Experiment(object):
             return _key("e:{0}".format(self.name))
 
     @classmethod
-    def find(cls, experiment_name, experiment_type=None,
-        redis=None):
+    def find(cls, experiment_name, redis=None):
 
         if not redis.sismember(_key("e"), experiment_name):
             raise ValueError('experiment does not exist')
 
-        if experiment_type is None:
-            algorithm = Experiment
-        else:
-            algorithm = ALGORITHMS[experiment_type]
+        algorithm_name = redis.hget(experiment_name, "algorithm")
+        if algorithm_name is None:
+            algorithm_name = "ab"
+
+        algorithm = ALGORITHMS[algorithm_name]
 
         return algorithm(experiment_name,
                    Experiment.load_alternatives(experiment_name, redis),
@@ -409,7 +410,7 @@ class Experiment(object):
 
         check_fraction = False
         try:
-            experiment = Experiment.find(experiment_name, redis=redis)
+            experiment = Experiment.find(experiment_name, experiment_type, redis=redis)
             check_fraction = True
         except ValueError:
             algorithm = ALGORITHMS[experiment_type]
