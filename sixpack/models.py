@@ -27,6 +27,7 @@ class Experiment(object):
         winner=False,
         traffic_fraction=False,
         explore_fraction=0.1,
+        algorithm=None,
         redis=None):
 
         if len(alternatives) < 2:
@@ -36,6 +37,8 @@ class Experiment(object):
         self.redis = redis
         self.alternatives = self.initialize_alternatives(alternatives)
         self.kpi = None
+
+        self._algorithm = algorithm
 
         # False here is a sentinal value for "not looked up yet"
         self._winner = winner
@@ -86,7 +89,7 @@ class Experiment(object):
         if self.is_new_record():
             pipe.sadd(_key('e'), self.name)
 
-        pipe.hset(self.key(), 'algorithm', self.algorithm)
+        pipe.hset(self.key(), 'algorithm', self._algorithm)
         pipe.hset(self.key(), 'created_at', datetime.now().strftime("%Y-%m-%d %H:%M"))
         pipe.hset(self.key(), 'traffic_fraction', self._traffic_fraction)
         pipe.hset(self.key(), 'explore_fraction', self._explore_fraction)
@@ -478,7 +481,7 @@ class ABExperiment(Experiment):
         traffic_fraction=False,
         explore_fraction=False,
         redis=None):
-        super(ABExperiment, self).__init__(name, alternatives, winner, traffic_fraction, explore_fraction, redis)
+        super(ABExperiment, self).__init__(name, alternatives, winner, traffic_fraction, explore_fraction, "ab", redis)
 
     def choose_alternative(self, client):
         rnd = round(random.uniform(1, 0.01), 2)
@@ -519,7 +522,7 @@ class MABEGreedyExperiment(Experiment):
         traffic_fraction=False,
         explore_fraction=False,
         redis=None):
-        super(MABEGreedyExperiment, self).__init__(name, alternatives, winner, traffic_fraction, explore_fraction, redis)
+        super(MABEGreedyExperiment, self).__init__(name, alternatives, winner, traffic_fraction, explore_fraction, "mab:egreedy", redis)
 
     def choose_alternative(self, client):
         rnd = round(random.uniform(1, 0.01), 2)
