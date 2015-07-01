@@ -1,5 +1,6 @@
 import unittest
 import fakeredis
+import datetime
 
 from sixpack.models import Alternative, Experiment, Client
 from sixpack.server import create_app
@@ -171,3 +172,68 @@ class TestAlternativeModel(unittest.TestCase):
 
         # (10 * 42 + 10 * 0 + 10 * 12) / 30
         self.assertEqual(18, alt.average_reward())
+
+    def test_rewards_by_day(self):
+        exp = Experiment('rewardsbyday', ['yes', 'no'], redis=self.redis)
+        exp.save()
+
+        alt = Alternative('yes', exp, redis=self.redis)
+
+        dt = datetime.datetime(2015, 10, 1)
+        client = Client(0, redis=self.redis)
+        alt.record_participation(client)
+        alt.record_conversion(client, 12.10, dt)
+
+        dt = datetime.datetime(2015, 11, 1)
+        client = Client(1, redis=self.redis)
+        alt.record_participation(client)
+        alt.record_conversion(client, 12.10, dt)
+
+        rewards = alt.reward_by_day()
+        self.assertEqual(2, len(rewards))
+        self.assertEqual(12.10, rewards['2015-10-01'])
+        self.assertEqual(12.10, rewards['2015-11-01'])
+
+    def test_rewards_by_month(self):
+        exp = Experiment('rewardsbymonth', ['yes', 'no'], redis=self.redis)
+        exp.save()
+
+        alt = Alternative('yes', exp, redis=self.redis)
+
+        for i in range(10):
+            dt = datetime.datetime(2015, 10, i + 1)
+            client = Client(i, redis=self.redis)
+            alt.record_participation(client)
+            alt.record_conversion(client, 12.10, dt)
+
+        dt = datetime.datetime(2015, 11, 1)
+        client = Client(11, redis=self.redis)
+        alt.record_participation(client)
+        alt.record_conversion(client, 12.10, dt)
+
+        rewards = alt.reward_by_month()
+        self.assertEqual(2, len(rewards))
+        self.assertEqual(12.10, rewards['2015-11'])
+        self.assertEqual(121.0, rewards['2015-10'])
+
+    def test_rewards_by_year(self):
+        exp = Experiment('rewardsbyyear', ['yes', 'no'], redis=self.redis)
+        exp.save()
+
+        alt = Alternative('yes', exp, redis=self.redis)
+
+        for i in range(10):
+            dt = datetime.datetime(2015, 10, i + 1)
+            client = Client(i, redis=self.redis)
+            alt.record_participation(client)
+            alt.record_conversion(client, 12.10, dt)
+
+        dt = datetime.datetime(2014, 10, 1)
+        client = Client(11, redis=self.redis)
+        alt.record_participation(client)
+        alt.record_conversion(client, 12.10, dt)
+
+        rewards = alt.reward_by_year()
+        self.assertEqual(2, len(rewards))
+        self.assertEqual(12.10, rewards['2014'])
+        self.assertEqual(121.0, rewards['2015'])

@@ -31,7 +31,7 @@ def convert(experiment, experiment_type, client_id, reward,
     datetime=None,
     redis=None):
 
-    exp = Experiment.find(experiment, experiment_type, redis=redis)
+    exp = Experiment.find(experiment, redis=redis)
 
     if cfg.get('enabled', True):
         client = Client(client_id, redis=redis)

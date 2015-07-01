@@ -160,7 +160,7 @@ class Sixpack(object):
             dt = dateutil.parser.parse(request.args.get("datetime"))
 
         if should_exclude_visitor(request):
-            exp = Experiment.find(experiment_name, experiment_type, redis=self.redis)
+            exp = Experiment.find(experiment_name, redis=self.redis)
             if exp.winner is not None:
                 alt = exp.winner
             else:

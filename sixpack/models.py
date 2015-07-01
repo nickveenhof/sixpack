@@ -724,12 +724,12 @@ class Alternative(object):
 
         pipe = self.redis.pipeline()
 
-        search_key = _key("{0}:{1}:{2}".format(stat_type, exp_key, stat_range))
+        search_key = _key("c:{0}:{1}".format(exp_key, stat_range))
         keys = self.redis.smembers(search_key)
 
         for k in keys:
             name = self.name if stat_type == 'p' else "{0}:users".format(self.name)
-            range_key = _key("c:{0}:{1}:rewards:{3}".format(exp_key, k, stat_type))
+            range_key = _key("c:{0}:{1}:rewards:{2}".format(exp_key, k, stat_type))
             pipe.get(range_key)
 
         redis_results = pipe.execute()
@@ -776,9 +776,9 @@ class Alternative(object):
         else:
             date = dt
 
-        exploration = self.redis.getbit("p:{0}:explore".format(experiment_key), self.experiment.sequential_id(client))
-
         experiment_key = self.experiment.kpi_key()
+
+        exploration = self.redis.getbit("p:{0}:explore".format(experiment_key), self.experiment.sequential_id(client))
 
         pipe = self.redis.pipeline()
 
