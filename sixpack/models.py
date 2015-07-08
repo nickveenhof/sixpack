@@ -290,7 +290,7 @@ class Experiment(object):
 
     def set_traffic_fraction(self, fraction):
         fraction = float(fraction)
-        if not 0 < fraction <= 1:
+        if not 0 <= fraction <= 1:
             raise ValueError('invalid traffic fraction range')
 
         self._traffic_fraction = fraction
@@ -306,7 +306,7 @@ class Experiment(object):
 
     def set_explore_fraction(self, fraction):
         fraction = float(fraction)
-        if not 0 < fraction <= 1:
+        if not 0 <= fraction <= 1:
             raise ValueError('invalid explore fraction range')
 
         self._explore_fraction = fraction
