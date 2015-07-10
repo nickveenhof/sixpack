@@ -194,6 +194,35 @@ class TestAlternativeModel(unittest.TestCase):
         self.assertEqual(12.10, rewards['2015-10-01'])
         self.assertEqual(12.10, rewards['2015-11-01'])
 
+    def test_rewards_explore_by_day(self):
+        exp = Experiment('rewardsexplorebyday', ['yes', 'no'], redis=self.redis)
+        exp.save()
+
+        alt = Alternative('yes', exp, redis=self.redis)
+
+        dt = datetime.datetime(2015, 10, 1)
+        client = Client(0, redis=self.redis)
+        alt.record_participation(client, False)
+        alt.record_conversion(client, 12.10, dt)
+
+        rewards = alt.reward_explore_by_day()
+        self.assertEqual(1, len(rewards))
+        self.assertEqual(0, rewards['2015-10-01'])
+
+        client = Client(1, redis=self.redis)
+        alt.record_participation(client)
+        alt.record_conversion(client, 12.10, dt)
+
+        dt = datetime.datetime(2015, 11, 1)
+        client = Client(2, redis=self.redis)
+        alt.record_participation(client)
+        alt.record_conversion(client, 12.10, dt)
+
+        rewards = alt.reward_explore_by_day()
+        self.assertEqual(2, len(rewards))
+        self.assertEqual(12.10, rewards['2015-10-01'])
+        self.assertEqual(12.10, rewards['2015-11-01'])
+
     def test_rewards_by_month(self):
         exp = Experiment('rewardsbymonth', ['yes', 'no'], redis=self.redis)
         exp.save()

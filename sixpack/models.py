@@ -734,7 +734,10 @@ class Alternative(object):
 
         redis_results = pipe.execute()
         for idx, k in enumerate(keys):
-            stats[k] = float(redis_results[idx])
+            if not redis_results[idx] is None:
+                stats[k] = float(redis_results[idx])
+            else:
+                stats[k] = 0
 
         return stats
 
