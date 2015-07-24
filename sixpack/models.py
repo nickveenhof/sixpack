@@ -227,6 +227,9 @@ class Experiment(object):
         return self.redis.hexists(self.key(), 'archived')
 
     def convert(self, client, reward, dt=None, kpi=None):
+        if self.is_client_excluded(client):
+            raise ValueError('this client was not participating')
+
         alternative = self.existing_alternative(client)
         if not alternative:
             raise ValueError('this client was not participating')
