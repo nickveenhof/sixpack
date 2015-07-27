@@ -578,18 +578,24 @@ class Alternative(object):
             'day': {
                 'participants': self.participants_by_day,
                 'conversions': self.conversions_by_day,
+                'participants_explore': self.participants_explore_by_day,
+                'conversions_explore': self.conversions_explore_by_day,
                 'reward': self.reward_by_day,
                 'reward_explore': self.reward_explore_by_day,
             },
             'month': {
                 'participants': self.participants_by_month,
                 'conversions': self.conversions_by_month,
+                'participants_explore': self.participants_explore_by_month,
+                'conversions_explore': self.conversions_explore_by_month,
                 'reward': self.reward_by_month,
                 'reward_explore': self.reward_explore_by_month
             },
             'year': {
                 'participants': self.participants_by_year,
                 'conversions': self.conversions_by_year,
+                'participants_explore': self.participants_explore_by_year,
+                'conversions_explore': self.conversions_explore_by_year,
                 'reward': self.reward_by_year,
                 'reward_explore': self.reward_explore_by_year
             },
@@ -598,19 +604,25 @@ class Alternative(object):
         data = []
         conversion_fn = PERIOD_TO_METHOD_MAP[period]['conversions']
         participants_fn = PERIOD_TO_METHOD_MAP[period]['participants']
+        conversion_explore_fn = PERIOD_TO_METHOD_MAP[period]['conversions_explore']
+        participants_explore_fn = PERIOD_TO_METHOD_MAP[period]['participants_explore']
         reward_fn = PERIOD_TO_METHOD_MAP[period]['reward']
         reward_explore_fn = PERIOD_TO_METHOD_MAP[period]['reward_explore']
 
         conversions = conversion_fn()
         participants = participants_fn()
+        conversions_explore = conversion_explore_fn()
+        participants_explore = participants_explore_fn()
         reward = reward_fn()
         reward_explore = reward_explore_fn()
 
-        dates = sorted(list(set(conversions.keys() + participants.keys() + reward.keys() + reward_explore.keys())))
+        dates = sorted(list(set(conversions.keys() + participants.keys() + conversions_explore.keys() + participants_explore.keys() + reward.keys() + reward_explore.keys())))
         for date in dates:
             _data = {
                 'conversions': conversions.get(date, 0),
                 'participants': participants.get(date, 0),
+                'conversions_explore': conversions_explore.get(date, 0),
+                'participants_explore': participants_explore.get(date, 0),
                 'reward': reward.get(date, 0),
                 'reward_explore': reward_explore.get(date, 0),
                 'date': date
@@ -652,6 +664,15 @@ class Alternative(object):
     def participants_by_year(self):
         return self._get_stats('participations', 'years')
 
+    def participants_explore_by_day(self):
+        return self._get_stats('participations', 'days', explore=True)
+
+    def participants_explore_by_month(self):
+        return self._get_stats('participations', 'months', explore=True)
+
+    def participants_explore_by_year(self):
+        return self._get_stats('participations', 'years', explore=True)
+
     def completed_count(self):
         key = _key("c:{0}:{1}:users:all".format(self.experiment.kpi_key(), self.name))
         return self.redis.bitcount(key)
@@ -665,7 +686,16 @@ class Alternative(object):
     def conversions_by_year(self):
         return self._get_stats('conversions', 'years')
 
-    def _get_stats(self, stat_type, stat_range):
+    def conversions_explore_by_day(self):
+        return self._get_stats('conversions', 'days', explore=True)
+
+    def conversions_explore_by_month(self):
+        return self._get_stats('conversions', 'months', explore=True)
+
+    def conversions_explore_by_year(self):
+        return self._get_stats('conversions', 'years', explore=True)
+
+    def _get_stats(self, stat_type, stat_range, explore=False):
         if stat_type == 'participations':
             stat_type = 'p'
             exp_key = self.experiment.name
@@ -687,7 +717,10 @@ class Alternative(object):
 
         for k in keys:
             name = self.name if stat_type == 'p' else "{0}:users".format(self.name)
-            range_key = _key("{0}:{1}:{2}:{3}".format(stat_type, exp_key, name, k))
+            if not explore:
+                range_key = _key("{0}:{1}:{2}:{3}".format(stat_type, exp_key, name, k))
+            else:
+                range_key = _key("{0}:{1}:{2}:explore:{3}".format(stat_type, exp_key, name, k))
             pipe.bitcount(range_key)
 
         redis_results = pipe.execute()
@@ -773,6 +806,14 @@ class Alternative(object):
             _key("p:{0}:{1}:{2}".format(experiment_key, self.name, date.strftime('%Y-%m'))),
             _key("p:{0}:{1}:{2}".format(experiment_key, self.name, date.strftime('%Y-%m-%d'))),
         ]
+        if exploration:
+            keys.extend([
+                _key("p:{0}:{1}:explore:all".format(experiment_key, self.name)),
+                _key("p:{0}:{1}:explore:{2}".format(experiment_key, self.name, date.strftime('%Y'))),
+                _key("p:{0}:{1}:explore:{2}".format(experiment_key, self.name, date.strftime('%Y-%m'))),
+                _key("p:{0}:{1}:explore:{2}".format(experiment_key, self.name, date.strftime('%Y-%m-%d'))),
+            ])
+
         msetbit(keys=keys, args=([self.experiment.sequential_id(client), 1] * len(keys)))
 
     def record_conversion(self, client, reward, dt=None):
@@ -819,6 +860,13 @@ class Alternative(object):
             _key("c:{0}:{1}:users:{2}".format(experiment_key, self.name, date.strftime('%Y-%m'))),
             _key("c:{0}:{1}:users:{2}".format(experiment_key, self.name, date.strftime('%Y-%m-%d'))),
         ]
+        if exploration:
+            keys.extend([
+                _key("c:{0}:{1}:explore:{2}".format(experiment_key, self.name, date.strftime('%Y'))),
+                _key("c:{0}:{1}:explore:{2}".format(experiment_key, self.name, date.strftime('%Y-%m'))),
+                _key("c:{0}:{1}:explore:{2}".format(experiment_key, self.name, date.strftime('%Y-%m-%d'))),
+            ])
+
         msetbit(keys=keys, args=([self.experiment.sequential_id(client), 1] * len(keys)))
 
     def conversion_rate(self):
