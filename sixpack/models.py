@@ -387,7 +387,7 @@ class Experiment(object):
         if not redis.sismember(_key("e"), experiment_name):
             raise ValueError('experiment does not exist')
 
-        algorithm_name = redis.hget(experiment_name, "algorithm")
+        algorithm_name = redis.hget(_key("e:{0}".format(experiment_name)), "algorithm")
         if algorithm_name is None:
             algorithm_name = "ab"
 
@@ -526,11 +526,9 @@ class MABEGreedyExperiment(Experiment):
 
     def choose_alternative(self, client):
         rnd = round(random.uniform(1, 0.01), 2)
-        if rnd >= self.traffic_fraction:
+        if rnd > self.traffic_fraction:
             self.exclude_client(client)
             return self.control, False
-
-        idx = 0
 
         if random.random() < self.explore_fraction:
             # explore - pick a random alternative

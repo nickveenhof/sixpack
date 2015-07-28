@@ -27,7 +27,7 @@ class MABTester:
 		self._best_arm = alternatives[means.index(max(means))]
 		self._arms = {alt: BernoulliArm(means[idx]) for idx, alt in enumerate(alternatives)}
 
-		self._experiment = experiment(name, alternatives, redis=redis)
+		self._experiment = experiment(name, alternatives, traffic_fraction=1, redis=redis)
 
 		self._sims = sims
 		self._horizon = horizon
