@@ -2,7 +2,7 @@ import unittest
 # from numbers import Number
 # from sixpack.db import _key
 from datetime import datetime
-
+import dateutil
 import fakeredis
 
 from sixpack.models import Experiment, Alternative, Client
@@ -374,3 +374,50 @@ class TestExperimentModel(unittest.TestCase):
         # participation & completed count should be 1
         self.assertEqual(e.control.participant_count(), 1)
         self.assertEqual(e.control.completed_count(), 1)
+
+    def test_excluded_clients(self):
+        e = Experiment.find_or_create('count-excluded-clients', ['red', 'blue'], redis=self.redis)
+
+        for i in range(10):
+            c = Client("c-%d" % i, self.redis)
+            e.exclude_client(c)
+
+            # there is a very small chance that a client was not excluded.
+            self.assertEqual(e.excluded_clients(), i + 1)
+
+
+    def test_excluded_clients_detailed_stats(self):
+        import sixpack.db
+
+        e = Experiment.find_or_create('excluded-clients-stats', ['red', 'blue'], redis=sixpack.db.REDIS)
+
+        days = []
+        for year in (2015, 2016):
+            for month in range(1,4):
+                for day in range(1,5):
+                    dt = datetime(year, month, day)
+                    c = Client("c-%d" % len(days), self.redis)
+                    e._record_exclusion(c, dt)
+                    days.append(dt.strftime('%Y-%m-%d'))
+
+        ey = e.exclusions_by_year()
+        self.assertEqual(len(ey),  2)
+        self.assertEqual(ey["2015"],  12)
+        self.assertEqual(ey["2016"],  12)
+
+        em = e.exclusions_by_month()
+        self.assertEqual(len(em),  6)
+        self.assertEqual(em["2015-01"],  4)
+        self.assertEqual(em["2015-02"],  4)
+        self.assertEqual(em["2015-03"],  4)
+        self.assertEqual(em["2016-01"],  4)
+        self.assertEqual(em["2016-02"],  4)
+        self.assertEqual(em["2016-03"],  4)
+
+        ed = e.exclusions_by_day()
+        self.assertEqual(len(ed),  len(days))
+        # all keys in ed have value 1
+        for v in ed.values():
+            self.assertEqual(v, 1)
+        # there are no keys in ed that are not in 'days'
+        self.assertEquals(len(set(ed.keys()) - set(days)), 0)

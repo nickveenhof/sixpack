@@ -50,6 +50,9 @@ class Experiment(object):
         return '<Experiment: {0})>'.format(self.name)
 
     def objectify_by_period(self, period, slim=False):
+        if period not in ['day', 'month', 'year']:
+            raise ValueError("Unrecognized stat range: {0}".format(stat_range))
+
         objectified = {
             'name': self.name,
             'period': period,
@@ -57,6 +60,7 @@ class Experiment(object):
             'created_at': self.created_at,
             'traffic_fraction': self.traffic_fraction,
             'explore_fraction': self.explore_fraction,
+            'excluded_clients': self.excluded_clients(),
             'total_participants': self.total_participants(),
             'total_conversions': self.total_conversions(),
             'description': self.description,
@@ -66,6 +70,24 @@ class Experiment(object):
             'kpis': list(self.kpis),
             'kpi': self.kpi
         }
+
+        data = []
+
+        if period == "day":
+            exclusions = self.exclusions_by_day()
+        elif period == "month":
+            exclusions = self.exclusions_by_month()
+        elif period == "year":
+            exclusions = self.exclusions_by_year()
+
+        dates = sorted(list(set(exclusions)))
+        for date in dates:
+            _data = {
+                'exclusions': exclusions.get(date, 0),
+                'date': date
+            }
+            data.append(_data)
+        objectified["excluded_client_stats"] = data
 
         for alternative in self.alternatives:
             objectified_alt = alternative.objectify_by_period(period, slim)
@@ -144,13 +166,28 @@ class Experiment(object):
     def conversions_by_year(self):
         return self._get_stats('conversions', 'years')
 
+    def exclusions_by_day(self):
+        return self._get_stats('exclusions', 'days')
+
+    def exclusions_by_month(self):
+        return self._get_stats('exclusions', 'months')
+
+    def exclusions_by_year(self):
+        return self._get_stats('exclusions', 'years')
+
     def _get_stats(self, stat_type, stat_range):
         if stat_type == 'participations':
             stat_type = 'p'
             exp_key = self.name
+            pattern = "{0}:{1}:_all:{2}"
         elif stat_type == 'conversions':
             stat_type = 'c'
             exp_key = self.kpi_key()
+            pattern = "{0}:{1}:_all:users:{2}"
+        elif stat_type == 'exclusions':
+            stat_type = 'x'
+            exp_key = self.name
+            pattern = "{0}:{1}:{2}"
         else:
             raise ValueError("Unrecognized stat type: {0}".format(stat_type))
 
@@ -163,8 +200,7 @@ class Experiment(object):
         search_key = _key("{0}:{1}:{2}".format(stat_type, exp_key, stat_range))
         keys = self.redis.smembers(search_key)
         for k in keys:
-            mod = '' if stat_type == 'p' else "users:"
-            range_key = _key("{0}:{1}:_all:{2}{3}".format(stat_type, self.name, mod, k))
+            range_key = _key(pattern.format(stat_type, self.name, k))
             pipe.bitcount(range_key)
 
         redis_results = pipe.execute()
@@ -341,10 +377,38 @@ class Experiment(object):
     def exclude_client(self, client):
         key = _key("e:{0}:excluded".format(self.name))
         self.redis.setbit(key, self.sequential_id(client), 1)
+        self._record_exclusion(client)
+
+    def _record_exclusion(self, client, dt=None):
+        """Record a user's exclusion in a test."""
+        if dt is None:
+            date = datetime.now()
+        else:
+            date = dt
+
+        pipe = self.redis.pipeline()
+
+        pipe.sadd(_key("x:{0}:years".format(self.name)), date.strftime('%Y'))
+        pipe.sadd(_key("x:{0}:months".format(self.name)), date.strftime('%Y-%m'))
+        pipe.sadd(_key("x:{0}:days".format(self.name)), date.strftime('%Y-%m-%d'))
+
+        pipe.execute()
+
+        keys = [
+            _key("x:{0}:all".format(self.name)),
+            _key("x:{0}:{1}".format(self.name, date.strftime('%Y'))),
+            _key("x:{0}:{1}".format(self.name, date.strftime('%Y-%m'))),
+            _key("x:{0}:{1}".format(self.name, date.strftime('%Y-%m-%d'))),
+        ]
+        msetbit(keys=keys, args=([self.sequential_id(client), 1] * len(keys)))
 
     def is_client_excluded(self, client):
         key = _key("e:{0}:excluded".format(self.name))
         return self.redis.getbit(key, self.sequential_id(client))
+
+    def excluded_clients(self):
+        key = _key("e:{0}:excluded".format(self.name))
+        return self.redis.bitcount(key)
 
     def existing_alternative(self, client):
         if self.is_client_excluded(client):
