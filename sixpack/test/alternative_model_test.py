@@ -266,3 +266,17 @@ class TestAlternativeModel(unittest.TestCase):
         self.assertEqual(2, len(rewards))
         self.assertEqual(12.10, rewards['2014'])
         self.assertEqual(121.0, rewards['2015'])
+
+    def test_explore_stats(self):
+        exp = Experiment('explore_stats', ['yes', 'no'], redis=self.redis)
+        exp.save()
+
+        client = Client("client", redis=self.redis)
+
+        alt = Alternative('yes', exp, redis=self.redis)
+        alt.record_participation(client, True)
+        alt.record_conversion(client, 100, dt=datetime.datetime(2015, 11, 1))
+
+        self.assertEqual(alt.conversions_explore_by_day()["2015-11-01"], 1)
+        self.assertEqual(alt.conversions_explore_by_month()["2015-11"], 1)
+        self.assertEqual(alt.conversions_explore_by_year()["2015"], 1)
