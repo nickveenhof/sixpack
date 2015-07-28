@@ -11,16 +11,16 @@ class TestApi(unittest.TestCase):
     @patch.object(Experiment, "find_or_create")
     def test_participate(self, mock_find_or_create):
         exp = ABExperiment("test", ["no", "yes"], winner=None)
-        exp.get_alternative = Mock(return_value=Alternative("yes", exp))
+        exp.get_alternative = Mock(return_value=(Alternative("yes", exp), 'explore'))
         mock_find_or_create.return_value = exp
-        alternative = participate("test", "ab", ["no", "yes"], "id1")
+        alternative, policy = participate("test", "ab", ["no", "yes"], "id1")
         self.assertEqual("yes", alternative.name)
         self.assertEqual("test", alternative.experiment.name)
 
     @patch.object(Experiment, "find_or_create")
     def test_participate_with_forced_alternative(self, mock_find_or_create):
         mock_find_or_create.return_value = ABExperiment("test", ["no", "yes"], winner=None)
-        alternative = participate("test", "ab", ["no", "yes"], "id1", force="yes")
+        alternative, policy = participate("test", "ab", ["no", "yes"], "id1", force="yes")
         self.assertEqual("yes", alternative.name)
 
     @patch.object(Experiment, "find")

@@ -48,7 +48,7 @@ class MABTester:
 				self._sim_nums[index] = sim + 1
 				self._times[index] = t + 1
 
-				arm = self._experiment.get_alternative(client)
+				arm, policy = self._experiment.get_alternative(client)
 				self._chosen_arms[index] = arm
 
 				reward = self._arms[arm.name].draw()

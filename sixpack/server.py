@@ -163,11 +163,13 @@ class Sixpack(object):
             exp = Experiment.find(experiment_name, redis=self.redis)
             if exp.winner is not None:
                 alt = exp.winner
+                policy = 'exclude'
             else:
                 alt = exp.control
+                policy = 'exclude'
         else:
             try:
-                alt = participate(experiment_name, experiment_type, alts, client_id,
+                alt, policy = participate(experiment_name, experiment_type, alts, client_id,
                                   force=force, traffic_fraction=traffic_fraction,
                                   explore_fraction=explore_fraction, prefetch=prefetch,
                                   datetime=dt, redis=self.redis)
@@ -176,7 +178,8 @@ class Sixpack(object):
 
         resp = {
             'alternative': {
-                'name': alt.name
+                'name': alt.name,
+                'policy' : policy
             },
             'experiment': {
                 'name': alt.experiment.name,

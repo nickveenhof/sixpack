@@ -364,15 +364,17 @@ class Experiment(object):
           2. A server-chosen alternative
         """
         if self.is_archived():
-            return self.control
+            return self.control, 'exclude'
 
         chosen_alternative = self.existing_alternative(client)
-        if not chosen_alternative:
+        if chosen_alternative:
+            return chosen_alternative, 'repeat'
+        else:
             chosen_alternative, participate, explore = self.choose_alternative(client)
             if participate and not prefetch:
                 chosen_alternative.record_participation(client, explore, dt=dt)
 
-        return chosen_alternative
+            return chosen_alternative, 'exclude' if not participate else 'explore' if explore else 'exploit'
 
     def exclude_client(self, client):
         key = _key("e:{0}:excluded".format(self.name))

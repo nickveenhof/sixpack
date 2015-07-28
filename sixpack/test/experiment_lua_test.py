@@ -22,7 +22,7 @@ class TestExperimentLua(unittest.TestCase):
     def test_cant_convert_twice(self):
         exp = ABExperiment('test-cant-convert-twice', ['1', '2'], redis=self.app.redis)
         client = Client("eric", redis=self.app.redis)
-        alt = exp.get_alternative(client)
+        alt,policy = exp.get_alternative(client)
         exp.convert(client, 1)
         self.assertEqual(exp.total_conversions(), 1)
 
@@ -39,7 +39,7 @@ class TestExperimentLua(unittest.TestCase):
     def test_find_existing_conversion(self):
         exp = ABExperiment('test-find-existing-conversion', ['1', '2'], redis=self.app.redis)
         client = Client("eric", redis=self.app.redis)
-        alt = exp.get_alternative(client)
+        alt,policy = exp.get_alternative(client)
         exp.convert(client, 1)
         alt2 = exp.existing_conversion(client)
         self.assertIsNotNone(alt2)

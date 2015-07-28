@@ -146,13 +146,13 @@ class TestExperimentModel(unittest.TestCase):
         exp.archive()
 
         # should return control on archived test with no winner
-        alt = exp.get_alternative(client)
+        alt,policy = exp.get_alternative(client)
         self.assertEqual(alt.name, 'w')
 
         # should return current participation
         exp.unarchive()
 
-        selected_for_client = exp.get_alternative(client)
+        selected_for_client,policy = exp.get_alternative(client)
         self.assertIn(selected_for_client.name, ['w', 'l'])
 
         # should check to see if client is participating and only return the same alt
@@ -363,7 +363,8 @@ class TestExperimentModel(unittest.TestCase):
         c = Client("c", redis=sixpack.db.REDIS)
         e.exclude_client(c)
 
-        self.assertTrue(e.control == e.get_alternative(c))
+        alt, policy = e.get_alternative(c)
+        self.assertTrue(e.control == alt)
         try:
             e.convert(c, 1)
         except ValueError, ve:
@@ -376,7 +377,7 @@ class TestExperimentModel(unittest.TestCase):
         self.assertEqual(e.control.completed_count(), 1)
 
     def test_excluded_clients(self):
-        e = Experiment.find_or_create('count-excluded-clients', ['red', 'blue'], redis=self.redis)
+        e = Experiment.find_or_create('count-excluded-clients', 'ab', ['red', 'blue'], redis=self.redis)
 
         for i in range(10):
             c = Client("c-%d" % i, self.redis)
@@ -389,7 +390,7 @@ class TestExperimentModel(unittest.TestCase):
     def test_excluded_clients_detailed_stats(self):
         import sixpack.db
 
-        e = Experiment.find_or_create('excluded-clients-stats', ['red', 'blue'], redis=sixpack.db.REDIS)
+        e = Experiment.find_or_create('excluded-clients-stats', 'ab', ['red', 'blue'], redis=sixpack.db.REDIS)
 
         days = []
         for year in (2015, 2016):

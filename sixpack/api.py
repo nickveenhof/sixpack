@@ -15,15 +15,18 @@ def participate(experiment, experiment_type, alternatives, client_id,
     alt = None
     if force and force in alternatives:
         alt = Alternative(force, exp, redis=redis)
+        policy = 'excluded'
     elif not cfg.get('enabled', True):
         alt = exp.control
+        policy = 'excluded'
     elif exp.winner is not None:
         alt = exp.winner
+        policy = 'excluded'
     else:
         client = Client(client_id, redis=redis)
-        alt = exp.get_alternative(client, dt=datetime, prefetch=prefetch)
+        alt,policy = exp.get_alternative(client, dt=datetime, prefetch=prefetch)
 
-    return alt
+    return alt, policy
 
 
 def convert(experiment, experiment_type, client_id, reward,

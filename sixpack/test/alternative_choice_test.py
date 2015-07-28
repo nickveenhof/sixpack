@@ -55,7 +55,7 @@ class TestAlternativeChoice(unittest.TestCase):
         # mod 2: 1
         exp = ABExperiment('deterministic-1', ['y', 'n'], redis=self.redis)
         cli = SClient('09a7407c-e371-492b-82e3-ef438d960ca3', redis=self.redis)
-        alt = exp.get_alternative(cli).name
+        alt = exp.get_alternative(cli)[0].name
         self.assertEqual('n', alt)
 
         # test name: deterministic-1
@@ -68,7 +68,7 @@ class TestAlternativeChoice(unittest.TestCase):
         # mod 3: 1
         exp = ABExperiment('deterministic-1', ['y', 'n', 'm'], redis=self.redis)
         cli = SClient('09a7407c-e371-492b-82e3-ef438d960ca3', redis=self.redis)
-        alt = exp.get_alternative(cli).name
+        alt = exp.get_alternative(cli)[0].name
         self.assertEqual('n', alt)
 
         # test name: deterministic-2
@@ -81,7 +81,7 @@ class TestAlternativeChoice(unittest.TestCase):
         # mod 3: 0
         exp = ABExperiment('deterministic-2', ['y', 'n', 'm'], redis=self.redis)
         cli = SClient('1b7b8b69-9b5b-4720-ba08-3e449fd60260', redis=self.redis)
-        alt = exp.get_alternative(cli).name
+        alt = exp.get_alternative(cli)[0].name
         self.assertEqual('y', alt)
 
         # test name: deterministic-3
@@ -94,5 +94,5 @@ class TestAlternativeChoice(unittest.TestCase):
         # mod 6: 4
         exp = ABExperiment('deterministic-3', ['y', 'n', 'm', 'one', 'two', 'three'], redis=self.redis)
         cli = SClient('53c07ed4-80cd-4860-ad68-7eb76ed27180', redis=self.redis)
-        alt = exp.get_alternative(cli).name
+        alt = exp.get_alternative(cli)[0].name
         self.assertEqual('two', alt)
