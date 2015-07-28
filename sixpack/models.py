@@ -792,7 +792,7 @@ class Alternative(object):
         pipe.sadd(_key("p:{0}:months".format(experiment_key)), date.strftime('%Y-%m'))
         pipe.sadd(_key("p:{0}:days".format(experiment_key)), date.strftime('%Y-%m-%d'))
 
-        pipe.setbit("p:{0}:explore".format(experiment_key), self.experiment.sequential_id(client), exploration and 1 or 0)
+        pipe.setbit(_key("p:{0}:explore".format(experiment_key)), self.experiment.sequential_id(client), exploration and 1 or 0)
 
         pipe.execute()
 
@@ -825,7 +825,7 @@ class Alternative(object):
 
         experiment_key = self.experiment.kpi_key()
 
-        exploration = self.redis.getbit("p:{0}:explore".format(experiment_key), self.experiment.sequential_id(client))
+        exploration = self.redis.getbit(_key("p:{0}:explore".format(self.experiment.name)), self.experiment.sequential_id(client))
 
         pipe = self.redis.pipeline()
 
