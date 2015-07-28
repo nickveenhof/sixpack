@@ -862,9 +862,9 @@ class Alternative(object):
         ]
         if exploration:
             keys.extend([
-                _key("c:{0}:{1}:explore:{2}".format(experiment_key, self.name, date.strftime('%Y'))),
-                _key("c:{0}:{1}:explore:{2}".format(experiment_key, self.name, date.strftime('%Y-%m'))),
-                _key("c:{0}:{1}:explore:{2}".format(experiment_key, self.name, date.strftime('%Y-%m-%d'))),
+                _key("c:{0}:{1}:users:explore:{2}".format(experiment_key, self.name, date.strftime('%Y'))),
+                _key("c:{0}:{1}:users:explore:{2}".format(experiment_key, self.name, date.strftime('%Y-%m'))),
+                _key("c:{0}:{1}:users:explore:{2}".format(experiment_key, self.name, date.strftime('%Y-%m-%d'))),
             ])
 
         msetbit(keys=keys, args=([self.experiment.sequential_id(client), 1] * len(keys)))
