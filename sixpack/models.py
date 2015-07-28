@@ -764,8 +764,7 @@ class Alternative(object):
         keys = self.redis.smembers(search_key)
 
         for k in keys:
-            name = self.name if stat_type == 'p' else "{0}:users".format(self.name)
-            range_key = _key("c:{0}:{1}:rewards:{2}".format(exp_key, k, stat_type))
+            range_key = _key("c:{0}:{1}:{2}:rewards:{3}".format(exp_key, self.name, k, stat_type))
             pipe.get(range_key)
 
         redis_results = pipe.execute()
@@ -833,20 +832,20 @@ class Alternative(object):
         pipe.sadd(_key("c:{0}:months".format(experiment_key)), date.strftime('%Y-%m'))
         pipe.sadd(_key("c:{0}:days".format(experiment_key)), date.strftime('%Y-%m-%d'))
 
-        pipe.incrbyfloat(_key("c:{0}:rewards:total".format(experiment_key)), reward)
-        pipe.incrbyfloat(_key("c:{0}:{1}:rewards:total".format(experiment_key, date.strftime('%Y'))), reward)
-        pipe.incrbyfloat(_key("c:{0}:{1}:rewards:total".format(experiment_key, date.strftime('%Y-%m'))), reward)
-        pipe.incrbyfloat(_key("c:{0}:{1}:rewards:total".format(experiment_key, date.strftime('%Y-%m-%d'))), reward)
+        pipe.incrbyfloat(_key("c:{0}:{1}:rewards:total".format(experiment_key, self.name)), reward)
+        pipe.incrbyfloat(_key("c:{0}:{1}:{2}:rewards:total".format(experiment_key, self.name, date.strftime('%Y'))), reward)
+        pipe.incrbyfloat(_key("c:{0}:{1}:{2}:rewards:total".format(experiment_key, self.name, date.strftime('%Y-%m'))), reward)
+        pipe.incrbyfloat(_key("c:{0}:{1}:{2}:rewards:total".format(experiment_key, self.name, date.strftime('%Y-%m-%d'))), reward)
         if exploration:
-            pipe.incrbyfloat(_key("c:{0}:rewards:explore".format(experiment_key)), reward)
-            pipe.incrbyfloat(_key("c:{0}:{1}:rewards:explore".format(experiment_key, date.strftime('%Y'))), reward)
-            pipe.incrbyfloat(_key("c:{0}:{1}:rewards:explore".format(experiment_key, date.strftime('%Y-%m'))), reward)
-            pipe.incrbyfloat(_key("c:{0}:{1}:rewards:explore".format(experiment_key, date.strftime('%Y-%m-%d'))), reward)
+            pipe.incrbyfloat(_key("c:{0}:{1}:rewards:explore".format(experiment_key, self.name)), reward)
+            pipe.incrbyfloat(_key("c:{0}:{1}:{2}:rewards:explore".format(experiment_key, self.name, date.strftime('%Y'))), reward)
+            pipe.incrbyfloat(_key("c:{0}:{1}:{2}:rewards:explore".format(experiment_key, self.name, date.strftime('%Y-%m'))), reward)
+            pipe.incrbyfloat(_key("c:{0}:{1}:{2}:rewards:explore".format(experiment_key, self.name, date.strftime('%Y-%m-%d'))), reward)
         else:
-            pipe.incrbyfloat(_key("c:{0}:rewards:exploit".format(experiment_key)), reward)
-            pipe.incrbyfloat(_key("c:{0}:{1}:rewards:exploit".format(experiment_key, date.strftime('%Y'))), reward)
-            pipe.incrbyfloat(_key("c:{0}:{1}:rewards:exploit".format(experiment_key, date.strftime('%Y-%m'))), reward)
-            pipe.incrbyfloat(_key("c:{0}:{1}:rewards:exploit".format(experiment_key, date.strftime('%Y-%m-%d'))), reward)
+            pipe.incrbyfloat(_key("c:{0}:{1}:rewards:exploit".format(experiment_key, self.name)), reward)
+            pipe.incrbyfloat(_key("c:{0}:{1}:{2}:rewards:exploit".format(experiment_key, self.name, date.strftime('%Y'))), reward)
+            pipe.incrbyfloat(_key("c:{0}:{1}:{2}:rewards:exploit".format(experiment_key, self.name, date.strftime('%Y-%m'))), reward)
+            pipe.incrbyfloat(_key("c:{0}:{1}:{2}:rewards:exploit".format(experiment_key, self.name, date.strftime('%Y-%m-%d'))), reward)
 
         pipe.execute()
 
@@ -878,7 +877,7 @@ class Alternative(object):
     def total_reward(self):
         experiment_key = self.experiment.kpi_key()
 
-        result = self.redis.get(_key("c:{0}:rewards:total".format(experiment_key)))
+        result = self.redis.get(_key("c:{0}:{1}:rewards:total".format(experiment_key, self.name)))
         if result is None:
             return 0
         return float(result)
