@@ -334,6 +334,15 @@ class Experiment(object):
 
         self._traffic_fraction = fraction
 
+    def store_traffic_fraction(self):
+        pipe = self.redis.pipeline()
+        if self.is_new_record():
+            pipe.sadd(_key('e'), self.name)
+
+        pipe.hset(self.key(), 'traffic_fraction', self.traffic_fraction)
+
+        pipe.execute()
+
     @property
     def explore_fraction(self):
         if self._explore_fraction is False:
@@ -349,6 +358,15 @@ class Experiment(object):
             raise ValueError('invalid explore fraction range')
 
         self._explore_fraction = fraction
+
+    def store_explore_fraction(self):
+        pipe = self.redis.pipeline()
+        if self.is_new_record():
+            pipe.sadd(_key('e'), self.name)
+
+        pipe.hset(self.key(), 'explore_fraction', self._explore_fraction)
+
+        pipe.execute()
 
     def sequential_id(self, client):
         """Return the sequential id for this test for the passed in client"""
@@ -480,23 +498,29 @@ class Experiment(object):
         if explore_fraction is None:
             explore_fraction = 0.1
 
-        check_fraction = False
+        update = False
         try:
             experiment = Experiment.find(experiment_name, redis=redis)
-            check_fraction = True
+            update = True
         except ValueError:
             algorithm = ALGORITHMS[experiment_type]
             experiment = algorithm(experiment_name, alternatives, redis=redis)
-            # TODO: I want to revist this later
+            # TODO: I want to revisit this later
             experiment.set_traffic_fraction(traffic_fraction)
             experiment.set_explore_fraction(explore_fraction)
             experiment.save()
 
-        if check_fraction and experiment.traffic_fraction != traffic_fraction:
-            raise ValueError('do not change traffic fraction once a test has started. please delete in admin')
+        if update and experiment.traffic_fraction != traffic_fraction:
+            experiment.set_traffic_fraction(traffic_fraction)
+            experiment.store_traffic_fraction()
+
+        if update and experiment.explore_fraction != explore_fraction:
+            experiment.set_explore_fraction(explore_fraction)
+            experiment.store_explore_fraction()
 
         # Make sure the alternative options are correct. If they are not,
         # raise an error.
+
         if sorted(experiment.get_alternative_names()) != sorted(alternatives):
             raise ValueError('experiment alternatives have changed. please delete in the admin')
 
